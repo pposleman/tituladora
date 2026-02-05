@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editor de Zócalo</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<!-- Fuente -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+/* ===== BASE ===== */
+body {
+  margin: 0;
+  padding: 8px;
+  font-family: 'Roboto Condensed', Arial, sans-serif;
+  background: #111;
+  color: #eee;
+}
+
+/* CONTENEDOR PRINCIPAL */
+.editor {
+  width: 100%;
+  margin: 0;
+}
+
+/* ===== PREVIEW 16:9 ===== */
+.preview-wrapper {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 14px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 3px solid #7f8c8d;
+}
+
+.preview-wrapper.al-aire { border-color: #2ecc71; }
+.preview-wrapper.pendiente { border-color: #f1c40f; }
+.preview-wrapper.oculto { border-color: #7f8c8d; }
+
+.preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: black;
+}
+
+/* FRAME FULL HD */
+.frame {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://raw.githubusercontent.com/pposleman/tituladora/57e4934d22db47bd52a488c4ef17aa0383d831a7/zocalo.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 0;
+}
+
+/* CAPA TEXTO */
+.contenedor {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  margin-right: 10%;
+  margin-left: 2%;
+  pointer-events: none;
+}
+
+/* TEXTO PREVIEW (ESCALA PROPORCIONAL) */
+.preview-nombre {
+  position: absolute;
+  bottom: 21%;
+  left: 10%;
+font-size: 1.8vw;
+	font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.preview-titulo {
+  position: absolute;
+  bottom: 11.0%;
+  left: 11.0%;
+   font-size: 2.3vw;
+	font-weight: 600;
+	color: red;
+
+}
+
+/* ESTADO */
+.estado {
+  position: absolute;
+  top: 14px;
+  right: 10px;
+  background: rgba(0,0,0,.6);
+  padding: 4px 8px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+/* ===== FORM ===== */
+label {
+  display: block;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 20px;
+  padding: 12px;
+  margin-top: 6px;
+  resize: none;
+  border-radius: 4px;
+  border: none;
+}
+
+/* BOTONES */
+.botones {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  flex: 1;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+
+.enviar { background: #2ecc71; }
+.ocultar { background: #e67e22; }
+.limpiar { background: #555; color: #fff; }
+
+/* ===== MOBILE ===== */
+@media (max-width: 480px) {
+  .botones {
+    flex-direction: column;
+  }
+}
+
+/* ===== DESKTOP ===== */
+@media (min-width: 900px) {
+
+  body {
+    padding: 24px;
+  }
+
+  .editor {
+    max-width: 1100px;
+    margin: auto;
+  }
+
+  /* PREVIEW MÁS GRANDE */
+  .preview-wrapper {
+    margin-bottom: 28px;
+  }
+
+  /* TEXTO PREVIEW AJUSTADO */
+  .preview-nombre {
+  
+   font-size: clamp(0.8rem, 1.9vw, 1.3rem);
+	font-weight: 600;
+  }
+
+  .preview-titulo {
+    font-size: clamp(0.8rem, 2.2vw, 1.6rem);
+	font-weight: 600;
+  }
+
+  /* FORM: UNA COLUMNA, ANCHO COMPLETO */
+  label {
+    font-size: 25px;
+    margin-top: 18px;
+  }
+
+  textarea {
+    font-size: 30px;
+    padding: 5px;
+  }
+
+  /* BOTONES ABAJO, COMO HOY */
+  .botones {
+    margin-top: 22px;
+    flex-direction: row;
+  }
+
+  button {
+    font-size: 15px;
+    padding: 14px;
+  }
+}
+
+
+</style>
+</head>
+
+<body>
+
+<div class="editor">
+
+  <!-- PREVIEW -->
+  <div id="previewWrap" class="preview-wrapper oculto">
+    <div class="preview">
+      <div class="frame"></div>
+
+      <div class="contenedor">
+        <div class="preview-nombre" id="prevNombre">Nombre y Cargo</div>
+        <div class="preview-titulo" id="prevTitulo">Texto del zócalo</div>
+        <div class="estado" id="estado">OCULTO</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUTS -->
+  <label>Nombre y cargo</label>
+  <textarea id="inpNombre" rows="2"></textarea>
+
+  <label>Título del zócalo</label>
+  <textarea id="inpTitulo" rows="3"></textarea>
+
+  <!-- BOTONES -->
+  <div class="botones">
+    <button class="enviar" id="btnEnviar">ENVIAR</button>
+    <button class="ocultar" id="btnOcultar">OCULTAR</button>
+    <button class="limpiar" id="btnLimpiar">LIMPIAR</button>
+  </div>
+
+</div>
+
+<script>
+/* ===== FIREBASE ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAYe51I6XTznRDXRiFPkrKTVf_Y8XEgeT8",
+  authDomain: "zocalos-streaming-v1.firebaseapp.com",
+  databaseURL: "https://zocalos-streaming-v1-default-rtdb.firebaseio.com",
+  projectId: "zocalos-streaming-v1"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ===== ELEMENTOS ===== */
+const inpNombre = document.getElementById("inpNombre");
+const inpTitulo = document.getElementById("inpTitulo");
+const prevNombre = document.getElementById("prevNombre");
+const prevTitulo = document.getElementById("prevTitulo");
+const previewWrap = document.getElementById("previewWrap");
+const estadoEl = document.getElementById("estado");
+
+/* ===== ESTADO ===== */
+let draft = { nombreCargo: "", titulo: "" };
+let live  = { nombreCargo: "", titulo: "", visible: false };
+
+function actualizarPreview() {
+  prevNombre.textContent = draft.nombreCargo || "Nombre y Cargo";
+  prevTitulo.textContent = draft.titulo || "Texto del zócalo";
+  evaluarEstado();
+}
+
+function evaluarEstado() {
+  previewWrap.className = "preview-wrapper";
+
+  if (!live.visible) {
+    previewWrap.classList.add("oculto");
+    estadoEl.textContent = "OCULTO";
+    return;
+  }
+
+  if (draft.nombreCargo === live.nombreCargo &&
+      draft.titulo === live.titulo) {
+    previewWrap.classList.add("al-aire");
+    estadoEl.textContent = "AL AIRE";
+  } else {
+    previewWrap.classList.add("pendiente");
+    estadoEl.textContent = "MODIFICADO";
+  }
+}
+
+/* ===== INPUTS ===== */
+inpNombre.oninput = () => {
+  draft.nombreCargo = inpNombre.value;
+  db.ref("zocalo/draft/nombreCargo").set(draft.nombreCargo);
+  actualizarPreview();
+};
+
+inpTitulo.oninput = () => {
+  draft.titulo = inpTitulo.value;
+  db.ref("zocalo/draft/titulo").set(draft.titulo);
+  actualizarPreview();
+};
+
+/* ===== BOTONES ===== */
+btnEnviar.onclick = () => {
+  db.ref("zocalo/live").set({
+    nombreCargo: draft.nombreCargo,
+    titulo: draft.titulo,
+    visible: true
+  });
+};
+
+btnOcultar.onclick = () => {
+  db.ref("zocalo/live/visible").set(false);
+};
+
+btnLimpiar.onclick = () => {
+  inpNombre.value = "";
+  inpTitulo.value = "";
+  draft = { nombreCargo: "", titulo: "" };
+  db.ref("zocalo/draft").set(draft);
+  actualizarPreview();
+};
+
+/* ===== LISTENER ===== */
+db.ref("zocalo").on("value", snap => {
+  const d = snap.val();
+  if (!d) return;
+
+  draft = d.draft || draft;
+  live  = d.live  || live;
+
+  inpNombre.value = draft.nombreCargo || "";
+  inpTitulo.value = draft.titulo || "";
+
+  actualizarPreview();
+});
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
